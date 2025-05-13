@@ -6,7 +6,7 @@
     <!-- name and version of the module -->
     <groupId>CongressOfVienna</groupId>
     <artifactId>CongressOfVienna</artifactId>
-    <version>playtest-51.3</version>
+    <version>1.0.6</version>
 
     <properties>
         <!-- set Vassal version here -->
