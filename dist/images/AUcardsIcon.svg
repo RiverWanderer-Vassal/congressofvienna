@@ -1,0 +1,11 @@
+<svg width="7" height="32" xmlns="http://www.w3.org/2000/svg" viewBox="-1 0 7 32">
+  <!-- Background rectangle extended 1px to the left -->
+  <rect fill="#6C7076" x="-1" width="7" height="32" y="0"/>
+  
+  <!-- Letters unchanged, centered at x=3 -->
+  <text x="3" font-size="8" y="26" transform="rotate(-90 3 26)" text-anchor="middle" fill="white" font-family="Arial, sans-serif" dominant-baseline="middle">C</text>
+  <text x="3" font-size="8" y="21" transform="rotate(-90 3 21)" text-anchor="middle" fill="white" font-family="Arial, sans-serif" dominant-baseline="middle">a</text>
+  <text x="3" font-size="8" y="17" transform="rotate(-90 3 17)" text-anchor="middle" fill="white" font-family="Arial, sans-serif" dominant-baseline="middle">r</text>
+  <text x="3" font-size="8" y="13" transform="rotate(-90 3 13)" text-anchor="middle" fill="white" font-family="Arial, sans-serif" dominant-baseline="middle">d</text>
+  <text x="3" font-size="8" y="9" transform="rotate(-90 3 9)" text-anchor="middle" fill="white" font-family="Arial, sans-serif" dominant-baseline="middle">s</text>
+</svg>

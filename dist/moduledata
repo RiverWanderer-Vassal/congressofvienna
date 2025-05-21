@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <data version="1">
-  <version>1.0.0</version>
+  <version>0.3.5-MB</version>
   <extra1/>
-  <extra2>&lt;br&gt;by Joel Toppen &amp; Frank Esparrago with enhancements by Mark Benson.</extra2>
+  <extra2>&lt;br&gt;by Fredrik Lindner &amp; Mark Benson&lt;br&gt;Published by permission of GMT Games LLC (c) 2024&lt;br&gt;Game Design by Frank Esparrago</extra2>
   <VassalVersion>3.7.16</VassalVersion>
-  <dateSaved>1747529781712</dateSaved>
-  <description>All modes supported. See Help menu to get started.</description>
+  <dateSaved>1747834244089</dateSaved>
+  <description>See Help Menu to get started!</description>
   <name>Congress of Vienna</name>
 </data>
