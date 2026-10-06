@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <data version="1">
-  <version>2.0.0a57</version>
+  <version>2.0.0a58</version>
   <extra1/>
   <extra2>&lt;br&gt;by Fredrik Lindner &amp; Mark Benson&lt;br&gt;Published by permission of GMT Games LLC (c) 2024&lt;br&gt;Game Design by Frank Esparrago&lt;br&gt;Original Game Graphics by Terry Leeds</extra2>
-  <VassalVersion>3.7.22</VassalVersion>
-  <dateSaved>1778799018584</dateSaved>
+  <VassalVersion>3.7.29</VassalVersion>
+  <dateSaved>1791323444974</dateSaved>
   <description>See Help Menu to get started!</description>
   <name>Congress of Vienna</name>
 </data>
