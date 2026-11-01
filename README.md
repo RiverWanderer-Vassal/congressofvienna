@@ -9,7 +9,6 @@ VASSAL module for *Congress of Vienna* (GMT Games), v2 development series.
 ## History
 
 Earlier builds were recovered from the maintainers' archives and committed in order, with their original save dates.
-Each commit is tagged with its version.
 
 | Version | Line | VASSAL | Saved | Notes |
 |---|---|---|---|---|
