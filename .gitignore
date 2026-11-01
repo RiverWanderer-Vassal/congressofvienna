@@ -45,3 +45,6 @@ bin/
 .*.swp
 # Mac archive cruft
 __MACOSX/
+
+# Python
+__pycache__/
