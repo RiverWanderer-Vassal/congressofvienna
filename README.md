@@ -25,6 +25,24 @@ Earlier builds were recovered from the maintainers' archives and committed in or
 V1 library releases 1.0.3–1.0.5 and 1.0.7–1.0.8 were made by other contributors and are available from the
 [VASSAL module library](https://vassalengine.org/library/projects/Congress_of_Vienna); they are not in this history.
 
+## Contributing
+
+`main` is protected: it can't be deleted or force-pushed, and changes from collaborators arrive by pull request
+(no approval needed, so you can merge your own). Nothing merged is ever lost, so any change can be reverted.
+
+`buildFile.xml` is one large file that VASSAL rewrites on every save, so two people editing the module at the
+same time will produce changes that can't sensibly be merged. To avoid that:
+
+1. **Claim it.** Say on the CoV Discord that you're editing the module, and say when you're done.
+2. **Start from the latest.** `git pull` on `main`, then build or open that version in the VASSAL editor.
+3. **Work on a branch.** `git switch -c my-change`, make your edits, save the `.vmod`.
+4. **Unpack over `dist/`.** Unzip the saved `.vmod` over `dist/` (delete `dist/` first so removed files go too;
+   don't commit `__MACOSX/`).
+5. **Commit and open a pull request.** Describe the change and any issue it fixes (`Fixes #12`), then merge it
+   promptly so the next person starts from it.
+
+Bump the module version in the VASSAL editor (Module properties) and in `pom.xml` when you make a release.
+
 ## Bugs and requests
 
 Report issues in this repository's Issues tab. Older reports are on
