@@ -10,6 +10,7 @@
 - **Resolved issues stay greyed** (#14, #15): Treaty of Ghent / Canada Annexed, Austria at War and Armistice are greyed in every phase once resolved.
 - **Army Box over-capacity** (#17): a unit refused by a full Army Box returns into its own deck instead of lying loose on top of it.
 - **Gold pawn** : "Proceed to Wager Phase" (the F12 deal-glitch workaround) is offered only in the Deal phase. Before, choosing it during the Initial Environment Table skipped the rest of the table and the deal.
+- **Faster card deal** (#25): the per-card "draws a card" report no longer runs while dealing (it printed nothing during the deal but cost about 0.2 s per card). Roughly 15% faster on stock VASSAL, about 3x faster again on a VASSAL build with the keystroke fix (vassalengine/vassal#15257).
 - **Situation Cards**: removed two leftover debug lines from the chat log (e.g. "SCRUunitB2 2" on card A-6).
 - **VP-denying cards** (#23): Andrew Jackson, Sherbrooke and King Fernando VII of Spain now have *Play Alternative Action* (as Joseph Bonaparte already had), reserving their marker to cancel the opponent's end-of-turn VP.
 
