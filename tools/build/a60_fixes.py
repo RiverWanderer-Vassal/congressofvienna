@@ -101,7 +101,16 @@ def withdraw_msg_1812(raw):
         '<VASSAL.build.module.properties.GlobalTranslatableMessage description="a60 #12" initialValue="No withdrawal in the War of 1812 Box [13.4.2]" name="mNoWithdrawal1812"/>', '@@never@@')
 
 
-FIXES = [report_issue_link, veil_1812_resolved, veil_austria_armistice_resolved, dock_rejected_unit, withdraw_msg_1812]
+def remove_debug_reports(raw):
+    """Two ChangePropertyButtons left debug text in the chat on Situation Card play:
+    'SCRUunitB2 <n>' (RU units to Front B, e.g. SC A-6) and 'PLAYSC' (ETreroll reset)."""
+    if 'reportFormat="SCRUunitB2 $newValue$"' not in raw and 'reportFormat="PLAYSC"' not in raw:
+        return None
+    raw = replace_once(raw, 'reportFormat="SCRUunitB2 $newValue$"', 'reportFormat=""', '@@never@@')
+    return replace_once(raw, 'propChanger="P," propertyGate="" reportFormat="PLAYSC"', 'propChanger="P," propertyGate="" reportFormat=""', '@@never@@')
+
+
+FIXES = [report_issue_link, veil_1812_resolved, veil_austria_armistice_resolved, dock_rejected_unit, withdraw_msg_1812, remove_debug_reports]
 
 if __name__ == '__main__':
     raw = open(BF, encoding='utf-8').read()
