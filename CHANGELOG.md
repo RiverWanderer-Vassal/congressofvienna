@@ -9,6 +9,7 @@
 - **War of 1812 withdrawal** (#12): Front G now reports "No withdrawal in the War of 1812 Box [13.4.2]" instead of a red "Neither side may withdraw!".
 - **Resolved issues stay greyed** (#14, #15): Treaty of Ghent / Canada Annexed, Austria at War and Armistice are greyed in every phase once resolved.
 - **Army Box over-capacity** (#17): a unit refused by a full Army Box returns into its own deck instead of lying loose on top of it.
+- **Gold pawn** : "Proceed to Wager Phase" (the F12 deal-glitch workaround) is offered only in the Deal phase. Before, choosing it during the Initial Environment Table skipped the rest of the table and the deal.
 - **Situation Cards**: removed two leftover debug lines from the chat log (e.g. "SCRUunitB2 2" on card A-6).
 - **VP-denying cards** (#23): Andrew Jackson, Sherbrooke and King Fernando VII of Spain now have *Play Alternative Action* (as Joseph Bonaparte already had), reserving their marker to cancel the opponent's end-of-turn VP.
 

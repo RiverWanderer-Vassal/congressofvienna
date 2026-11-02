@@ -110,7 +110,17 @@ def remove_debug_reports(raw):
     return replace_once(raw, 'propChanger="P," propertyGate="" reportFormat="PLAYSC"', 'propChanger="P," propertyGate="" reportFormat=""', '@@never@@')
 
 
-FIXES = [report_issue_link, veil_1812_resolved, veil_austria_armistice_resolved, dock_rejected_unit, withdraw_msg_1812, remove_debug_reports]
+def wager_shortcut_deal_only(raw):
+    """Gold pawn 'Proceed to Wager Phase' (F12 deal-glitch workaround) was offered from the start of the turn and,
+    chosen during the Initial Environment Table, skipped the rest of the table and the card deal, announcing
+    'Card dealing complete. Ready for Wager!'. Offer it only in the Deal phase."""
+    return replace_once(raw,
+        'hideCmd;May proceed once hands have been dealt - normally automatic;Hide;{(AUdisabled',
+        'hideCmd;May proceed once hands have been dealt - normally automatic (a60: Deal phase only);Hide;{Phase != Deal || (AUdisabled',
+        'a60: Deal phase only')
+
+
+FIXES = [report_issue_link, veil_1812_resolved, veil_austria_armistice_resolved, dock_rejected_unit, withdraw_msg_1812, remove_debug_reports, wager_shortcut_deal_only]
 
 if __name__ == '__main__':
     raw = open(BF, encoding='utf-8').read()
