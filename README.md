@@ -45,7 +45,13 @@ Bump the module version in the VASSAL editor (Module properties) and in `pom.xml
 
 ## Bugs and requests
 
-Report issues in this repository's Issues tab. Older reports are on
+Report faults with **Help > Report an Issue** in the module: it opens this repository's bug form with the module,
+VASSAL and Java versions, the scenario and options, and the current game state filled in. Attach a saved game or log
+(renamed to `.zip`) from just before the fault. You can also open the form directly from the
+[Issues](https://github.com/RiverWanderer-Vassal/congressofvienna/issues/new/choose) tab.
+
+New issues get an automated first-pass triage comment from Claude (see [tools/triage](tools/triage/README.md)).
+Older reports are on
 [vassalengine/modules](https://github.com/vassalengine/modules/issues?q=label%3A%22Congress+of+Vienna%22).
 
 ## Credits
