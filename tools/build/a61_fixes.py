@@ -217,8 +217,9 @@ def paired_fronts(raw):
     """Paired fronts [13.6.1], printed on the map: Hanover needs Saxony occupied (Front A), Gascony needs
     Valencia and Toulouse needs Catalonia (Front D). Front C is refused at placement through moBlock (see
     PAIRED_CD); this adds the same Disable on the British Front C right-click command, a warning when a
-    Russian Military Operation is placed on Front B to attack Hanover without Saxony, and a red report at
-    the Front B battle start if Saxony is still not occupied (the attack cannot be carried out [13.6.1.4])."""
+    Russian Military Operation is placed on Front B to attack Hanover without Saxony, and, when Front B is chosen
+    in the battle menu without Saxony occupied, the Russian marker goes home and Front B is cancelled unless
+    France also has a marker there [13.6.1.4]."""
     if 'Paired front B warning (a61)' in raw:
         return None
     # BR right-click Front C
@@ -241,18 +242,43 @@ def paired_fronts(raw):
              'FrontBRU == "Pomerania" && ' + NO_SAXONY + '};;59122\\,0\\,warnMOpairedB;false;;;counted;;;;false;;1;1')
     s.insert(j + 1, '')
     raw = put_prototype(raw, m, pid, t, s)
-    # Front B battle start report
-    rpt = ('{MilOpBRU > 0 && FrontBRU == "Pomerania" && ' + NO_SAXONY + ' ? "<font color=red><b>The Coalition does not '
-           'occupy Saxony: the Russian attack on Hanover cannot be carried out. Return the Russian Military Operation '
-           'to the Diplomacy Display [13.6.1.1, 13.6.1.4].</b></font>" : ""}')
-    btn = ('<VASSAL.build.module.DoActionButton canDisable="false" disabledIcon="" doHotkey="false" doLoop="false" '
-           'doReport="true" doSound="false" hideWhenDisabled="false" hotkey="57370,0,setFrontB" hotkeys="" icon="" '
-           'index="false" indexProperty="" indexStart="1" indexStep="1" loopCount="1" loopType="counted" '
-           'name="a61: Paired fronts - Front B attack on Hanover needs Saxony [13.6.1.1]" postLoopKey="" preLoopKey="" '
-           'propertyGate="" reportFormat="' + attr(rpt) + '" soundClip="" text="" tooltip="" untilExpression="" whileExpression=""/>')
-    anchor = '<VASSAL.build.module.ToolbarMenu canDisable="false" description="Battle Fronts &amp; utilities"'
-    return replace_once(raw, anchor, btn + '\n            ' + anchor)
-
+    # Front B in the battle menu: the menu item becomes a check. If the Coalition does not occupy Saxony, the
+    # Russian Military Operation on the Northern Army goes back to the Diplomacy Display (its deregister re-locks
+    # Front B when no other marker is there, as after a battle), the chat says why, and the battle only runs if
+    # another Military Operation (France) still holds Front B. The original button keeps all its actions and
+    # is now fired by key only.
+    bad = 'FrontBRU == "Pomerania" && ' + NO_SAXONY
+    old = re.search(r'<VASSAL\.build\.module\.DoActionButton canDisable="true" disabledIcon="toolbarSpace-w02\.png"[^>]*'
+                    r'name="Front B" postLoopKey="58506,0,CHECKLASTBATTLE" preLoopKey="57370,0,setFrontB" propertyGate="LockB"[^>]*/>', raw)
+    assert old and raw.count(old.group(0)) == 1
+    e = old.group(0)
+    assert e.count('hotkey=""') == 1 and e.count('text="B: Northern Europe"') == 1
+    hidden = (e.replace('canDisable="true" disabledIcon="toolbarSpace-w02.png"', 'canDisable="false" disabledIcon=""')
+               .replace('hotkey=""', 'hotkey="59134,0,doFrontB"').replace('propertyGate="LockB"', 'propertyGate=""')
+               .replace('text="B: Northern Europe"', 'text=""'))
+    rpt = ('{MilOpBRU > 0 && ' + bad + ' ? "<font color=red><b>Front B: the Coalition does not occupy Saxony, so the '
+           'Russian attack on Hanover is cancelled and its Military Operation returns to the Diplomacy Display '
+           '[13.6.1.1, 13.6.1.4].</b></font>" + (MilOpBFR > 0 ? "" : " No Front B battle this turn.") : ""}')
+    menu = ('<VASSAL.build.module.DoActionButton canDisable="true" disabledIcon="toolbarSpace-w02.png" doHotkey="true" '
+            'doLoop="false" doReport="true" doSound="false" hideWhenDisabled="false" hotkey="" '
+            'hotkeys="59132\\,0\\,cancelRUfrontB,59133\\,0\\,chkFrontB" icon="" index="false" indexProperty="" '
+            'indexStart="1" indexStep="1" loopCount="1" loopType="counted" '
+            'name="a61: Front B - paired front check (Hanover needs Saxony) [13.6.1.1]" postLoopKey="" preLoopKey="" '
+            'propertyGate="LockB" reportFormat="' + attr(rpt) + '" soundClip="" text="B: Northern Europe" tooltip="" '
+            'untilExpression="" whileExpression=""/>')
+    gkc = ('<VASSAL.build.module.GlobalKeyCommand buttonHotkey="59132,0,cancelRUfrontB" buttonText="" canDisable="false" '
+           'deckCount="0" disabledIcon="" filter="' + attr('{' + bad + '}') + '" hideWhenDisabled="false" '
+           'hotkey="57354,0,gohome" icon="" name="a61: Russian Front B Military Operation home when Saxony is not occupied" '
+           'propertyGate="" reportFormat="" reportSingle="true" singleMap="true" suppressSounds="true" '
+           'target="MODULE|true|ZONE|$map$||Northern Army||0|0||true|sideCode|RU|EQUALS||" tooltip=""/>')
+    chk = ('<VASSAL.build.module.DoActionButton canDisable="false" disabledIcon="" doHotkey="true" doLoop="true" '
+           'doReport="false" doSound="false" hideWhenDisabled="false" hotkey="59133,0,chkFrontB" '
+           'hotkeys="59134\\,0\\,doFrontB" icon="" index="false" indexProperty="" indexStart="1" indexStep="1" '
+           'loopCount="' + attr('{LockB ? 0 : 1}') + '" loopType="counted" name="a61: Front B battle if still open" '
+           'postLoopKey="" preLoopKey="" propertyGate="" reportFormat="" soundClip="" text="" tooltip="" '
+           'untilExpression="" whileExpression=""/>')
+    ind = '\n            '
+    return raw.replace(e, menu + ind + gkc + ind + chk + ind + hidden)
 
 def version(raw):
     old = 'nextPieceSlotId="3804" version="2.0.0a60"'
