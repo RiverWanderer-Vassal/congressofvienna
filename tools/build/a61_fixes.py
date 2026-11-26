@@ -508,6 +508,31 @@ def end_of_battle(raw):
                         'Coalition holds the mountains,Return markers: battle over,')
 
 
+def free_milop_to_paris(raw):
+    """Free French Military Operation [12.4.4]: when the Conference ends with Napoleon available for the War Phase,
+    one French Military Operation not won on a National Track goes from the Diplomacy Display (else the Negotiation
+    Table) to Paris for free. a59 only reminded France to do it by hand. The move uses the marker's own To Paris
+    command (goParis), whose Disable already allows only one free marker in Paris, so a second one never follows."""
+    if 'Free French Mil Op to Paris (a61)' in raw:
+        return None
+    old = re.search(r'<VASSAL\.build\.module\.DoActionButton [^>]*name="a59: Free French Mil Op reminder \(12\.4\.4\)"[^>]*/>', raw).group(0)
+    rpt = ('<b><font color=blue>Napoleon was not used in the Diplomacy Phase: one French Military Operation goes to '
+           'Paris for free [12.4.4].</font></b>')
+    new = (old.replace('doHotkey="false"', 'doHotkey="true"')
+              .replace('hotkeys=""', 'hotkeys="59160\\,0\\,freeMOdip,59161\\,0\\,freeMOtable"')
+              .replace('name="a59: Free French Mil Op reminder (12.4.4)"', 'name="Free French Mil Op to Paris (a61) [12.4.4]"'))
+    new = re.sub(r'reportFormat="[^"]*"', 'reportFormat="' + attr(rpt) + '"', new)
+    tgt = 'MODULE|true|MAP|$map$||||0|0||true|BasicName|French Military Operation|EQUALS||'
+    def gkc(name, key, zone):
+        return ('<VASSAL.build.module.GlobalKeyCommand buttonHotkey="%s" buttonText="" canDisable="false" deckCount="0" '
+                'disabledIcon="" filter="%s" hideWhenDisabled="false" hotkey="57845,0,goParis" icon="" name="a61: %s" '
+                'parameters="" propertyGate="" reportFormat="" reportSingle="true" singleMap="true" suppressSounds="false" '
+                'target="%s" tooltip=""/>') % (key, attr('{FRMilOp == 1 && !isWon && CurrentZone == %s}' % zone), name, tgt)
+    ind = '\n    '
+    return replace_once(raw, old, new + ind + gkc('free French Mil Op from the Diplomacy Display', '59160,0,freeMOdip', 'DiplomacyZone')
+                        + ind + gkc('free French Mil Op from the Negotiation Table', '59161,0,freeMOtable', 'TableZone'))
+
+
 def version(raw):
     old = 'nextPieceSlotId="3804" version="2.0.0a60"'
     if old not in raw:
@@ -516,7 +541,7 @@ def version(raw):
 
 
 FIXES = [env_second_die_after_draw, milop_restrictions, battle_cards_from_every_hand, paired_fronts, mountain_hold,
-         end_of_battle, version]
+         end_of_battle, free_milop_to_paris, version]
 
 if __name__ == '__main__':
     raw = open(BF, encoding='utf-8').read()
