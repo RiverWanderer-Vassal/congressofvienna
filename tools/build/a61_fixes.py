@@ -282,30 +282,31 @@ def paired_fronts(raw):
 
 def mountain_hold(raw):
     """Battle menu: "France holds the mountains" / "Coalition holds the mountains" [13.4.5 Canceling a Retreat].
-    Offered only when the current battle's defender is in a mountain space (the attacker's mountain malus,
-    MountainCO / MountainFR, is -3) and nobody withdrew. The players confirm the conditions the module does not
-    track (losses differ by exactly one, at least one unit remains); pressing it logs the extra loss and the
-    cancelled retreat and locks both items until the next battle."""
+    Locked during the battle. "End of battle: read the battle track" opens the item only when the losing Army
+    defends in a mountain space (the attacker's mountain malus, MountainCO / MountainFR, is -3), nobody withdrew,
+    the losses differ by exactly one and at least one of the loser's units would remain after the extra loss.
+    Pressing it logs the extra loss and the cancelled retreat and locks both items until the next battle."""
     if 'name="LockFRhold"' in raw:
         return None
-    def gp(name, side_mtn):
-        on = '{!(ActiveFront =~ "A|C|D|F" && %s == -3)}' % side_mtn
+    def gp(name, side_mtn, side, other):
+        ok = ('{!(EobWithdrew == "" && ActiveFront =~ "A|C|D|F" && %s == -3 && EobHits%s - EobHits%s == 1 '
+              '&& EobUnits%s - EobHits%s > 1)}') % (side_mtn, other, side, side, other)
+        def cpb(desc, key, val):
+            return ('                <VASSAL.build.module.properties.ChangePropertyButton canDisable="false" desc="%s" '
+                    'disabledIcon="" hideWhenDisabled="false" hotkey="%s" icon="" propChanger="P,%s" propertyGate="" '
+                    'reportFormat="" text="" tooltip=""/>\n') % (desc, key, attr(val))
         return ('<VASSAL.build.module.properties.GlobalProperty description="a61: mountain hold button control" '
-                'initialValue="true" isNumeric="false" max="null" min="null" name="%s" wrap="false">\n'
-                '                <VASSAL.build.module.properties.ChangePropertyButton canDisable="false" desc="battle start: '
-                'open if this side defends in a mountain space" disabledIcon="" hideWhenDisabled="false" '
-                'hotkey="57482,0,initDRM" icon="" propChanger="P,%s" propertyGate="" reportFormat="" text="" tooltip=""/>\n'
-                '                <VASSAL.build.module.properties.ChangePropertyButton canDisable="false" desc="no hold after a '
-                'withdrawal" disabledIcon="" hideWhenDisabled="false" hotkey="57514,0,withdrawDRM" icon="" '
-                'propChanger="P,true" propertyGate="" reportFormat="" text="" tooltip=""/>\n'
-                '                <VASSAL.build.module.properties.ChangePropertyButton canDisable="false" desc="locked after use" '
-                'disabledIcon="" hideWhenDisabled="false" hotkey="59136,0,usedMountainHold" icon="" propChanger="P,true" '
-                'propertyGate="" reportFormat="" text="" tooltip=""/>\n'
-                '            </VASSAL.build.module.properties.GlobalProperty>\n            ') % (name, attr(on))
+                'initialValue="true" isNumeric="false" max="null" min="null" name="%s" wrap="false">\n' % name
+                + cpb('battle start: locked until the end of the battle', '57482,0,initDRM', 'true')
+                + cpb('end of battle: open if this side may hold the mountains', '59143,0,eobCalc', ok)
+                + cpb('no hold after a withdrawal', '57514,0,withdrawDRM', 'true')
+                + cpb('locked after use', '59136,0,usedMountainHold', 'true')
+                + cpb('locked when the markers go back', '59153,0,eobReturned', 'true')
+                + '            </VASSAL.build.module.properties.GlobalProperty>\n            ')
     anchor = '<VASSAL.build.module.properties.GlobalProperty description="button control" initialValue="true" isNumeric="false" max="null" min="null" name="LockCOwithdraw"'
-    raw = replace_once(raw, anchor, gp('LockFRhold', 'MountainCO') + gp('LockCOhold', 'MountainFR') + anchor)
+    raw = replace_once(raw, anchor, gp('LockFRhold', 'MountainCO', 'FR', 'CO') + gp('LockCOhold', 'MountainFR', 'CO', 'FR') + anchor)
     tail = (' loses one more unit to hold the mountains: the retreat is cancelled and the attacking Army stays in its '
-            'space [13.4.5]. Only allowed when the losses differ by exactly one and at least one unit remains.</b>')
+            'space [13.4.5].</b>')
     def btn(text, gate, rpt):
         return ('<VASSAL.build.module.DoActionButton canDisable="true" disabledIcon="toolbarSpace-w02.png" doHotkey="true" '
                 'doLoop="false" doReport="true" doSound="false" hideWhenDisabled="false" hotkey="" '
@@ -324,6 +325,189 @@ def mountain_hold(raw):
     return replace_once(raw, 'Coalition Withdraws!,', 'Coalition Withdraws!,France holds the mountains,Coalition holds the mountains,')
 
 
+FRONTS = ['A', 'B', 'DN', 'C', 'D', 'E', 'F', 'G']
+CO_MO = {'A': ['ARU', 'AAU'], 'B': ['BRU', 'BBR'], 'DN': ['DNRU'], 'C': ['CBR'], 'D': ['DBR'], 'E': ['EBR'],
+         'F': ['FAU'], 'G': ['GBR']}
+ARMY_ZONES = {'A': 'Army of Silesia|Army of Bohemia|Grande Armée', 'B': 'Northern Army|Army of Elbe|Army of Scheldt',
+              'DN': 'Denmark/Norway', 'C': 'Army of Portugal|Army of Spain', 'D': 'Eastern Army|Army of Mediterranean',
+              'E': 'Army of Sicily|Army of Naples', 'F': 'Army of Tyrol|Army of Italy', 'G': 'War of 1812'}
+
+
+def by_front(vals, default):
+    """Nested ternary on ActiveFront."""
+    e = default
+    for f in reversed(FRONTS):
+        if f in vals:
+            e = 'ActiveFront == "%s" ? %s : %s' % (f, vals[f], e)
+    return '(' + e + ')'
+
+
+def end_of_battle(raw):
+    """End of battle [13.4.4-13.4.6], at Mark's request (26 Nov 2026): the battle track is still played by hand;
+    "End of battle: read the battle track" in the battle menu then works through the post-battle steps in order.
+    1. Reads the losses each side inflicts from the DRM Track zone (result 0-5) under each battle pawn, names the
+       winner (more losses inflicted, nobody withdrew), or a draw, and the losses each side removes.
+    2. Major Battle [13.4.6]: both sides started with 4 or more units (the Coalition count on Front A already
+       combines the Armies of Silesia and Bohemia), nobody withdrew, not the War of 1812 Box. The winner gains
+       1 VP and the loser loses 1 VP, 2 when the Napoleon card was played in this battle (Napoleon was active at
+       the start of the battle and is not any more). On Front A Russia, and Austria when at war, both score; the
+       VP markers move through their usual addVP routine.
+    3. Mountain hold [13.4.5]: the hold item opens only when it is allowed (see mountain_hold).
+    4. Advance/retreat guidance [13.4.2, 13.4.5]; the players move the blocks and adjust space VPs [13.5].
+    5. "Return markers: battle over" sends this Front's Military Operations to the Diplomacy Display and its
+       Military Support markers to the Force Pools [13.4.6], through the markers' own commands, so the Front
+       locks again as when they are moved by hand."""
+    if 'name="EobHitsFR"' in raw:
+        return None
+
+    def pc(expr):  # a ChangePropertyButton value: commas are SequenceEncoder separators
+        return attr(expr.replace(',', '\\,'))
+
+    def cpb(desc, key, val):
+        return ('                <VASSAL.build.module.properties.ChangePropertyButton canDisable="false" desc="%s" '
+                'disabledIcon="" hideWhenDisabled="false" hotkey="%s" icon="" propChanger="P,%s" propertyGate="" '
+                'reportFormat="" text="" tooltip=""/>\n') % (desc, key, pc(val))
+
+    def gp(name, init, buttons, desc='a61: end of battle'):
+        return ('<VASSAL.build.module.properties.GlobalProperty description="%s" initialValue="%s" isNumeric="false" '
+                'max="null" min="null" name="%s" wrap="false">\n' % (desc, init, name)
+                + ''.join(cpb(*b) for b in buttons)
+                + '            </VASSAL.build.module.properties.GlobalProperty>\n            ')
+
+    INIT, CALC, READ = '57482,0,initDRM', '59143,0,eobCalc', '59140,0,eobRead'
+    hits = {s: ' + '.join('%d * CountZone("DRM Track %d", map, "{BasicName == \\"%s Battle DRM Pawn\\"}")' % (n, n, p)
+                          for n in range(1, 6))
+            for s, p in (('FR', 'French'), ('CO', 'Coalition'))}
+    fr_atk = by_front({f: 'MilOp%sFR > 0' % f for f in FRONTS}, 'false')
+    co_atk = by_front({f: ' || '.join('MilOp%s > 0' % m for m in CO_MO[f]) for f in FRONTS}, 'false')
+
+    # start-of-battle unit counts: the same pick-ups the battle strength uses (MilStrFR / MilStrCO)
+    def unit_buttons(src):
+        m = re.search(r'<VASSAL\.build\.module\.properties\.GlobalProperty [^>]*name="%s"[^>]*>(.*?)'
+                      r'</VASSAL\.build\.module\.properties\.GlobalProperty>' % src, raw, re.S)
+        out = []
+        for b in re.findall(r'<VASSAL\.build\.module\.properties\.ChangePropertyButton [^>]*/>', m.group(1)):
+            v = re.search(r'propChanger="([^"]*)"', b).group(1)
+            if v.startswith('P,{'):
+                out.append('                ' + b.replace('desc="', 'desc="a61 units: ') + '\n')
+        assert len(out) == 8, (src, len(out))
+        return out
+    units = {s: ('<VASSAL.build.module.properties.GlobalProperty description="a61: units at the start of the battle" '
+                 'initialValue="0" isNumeric="false" max="null" min="null" name="EobUnits%s" wrap="false">\n' % s
+                 + ''.join(unit_buttons('MilStr' + s))
+                 + '            </VASSAL.build.module.properties.GlobalProperty>\n            ') for s in ('FR', 'CO')}
+
+    gps = (gp('EobLock', 'true', [('battle start: open', INIT, 'false'), ('used', '59150,0,eobDone', 'true')])
+           + gp('EobReturnLock', 'true', [('battle start: locked', INIT, 'true'), ('open after the end of battle', '59150,0,eobDone', 'false'),
+                                          ('used', '59153,0,eobReturned', 'true')])
+           + gp('EobWithdrew', '', [('battle start', INIT, ''), ('France withdrew', '59141,0,eobFRwd', 'FR'),
+                                    ('Coalition withdrew', '59142,0,eobCOwd', 'CO')])
+           + gp('EobNapStart', 'true', [('Napoleon active at the start of the battle', INIT, '{NapoleonActive}')])
+           + units['FR'] + units['CO']
+           + gp('EobHitsFR', '0', [('losses inflicted by France', READ, '{' + hits['FR'] + '}')])
+           + gp('EobHitsCO', '0', [('losses inflicted by the Coalition', READ, '{' + hits['CO'] + '}')])
+           + gp('EobFRatk', 'false', [('France has a Military Operation on this Front', READ, '{' + fr_atk + '}')])
+           + gp('EobCOatk', 'false', [('the Coalition has a Military Operation on this Front', READ, '{' + co_atk + '}')])
+           + gp('EobWinner', '', [('FR, CO, draw, or empty after a withdrawal', CALC,
+                                   '{EobWithdrew != "" ? "" : EobHitsFR > EobHitsCO ? "FR" : EobHitsCO > EobHitsFR ? "CO" : "draw"}')])
+           + gp('EobMajor', 'false', [('Major Battle [13.4.6]', CALC,
+                                       '{EobWithdrew == "" && EobHitsFR != EobHitsCO && ActiveFront != "G" && EobUnitsFR >= 4 && EobUnitsCO >= 4}')])
+           + gp('EobVP', '1', [('2 with the Napoleon card', CALC, '{EobNapStart && !NapoleonActive ? 2 : 1}')])
+           + gp('EobCOsides', 'RU', [('Coalition powers scoring this Front', CALC,
+                                      '{ActiveFront == "A" ? (WarState == 2 ? "RU|AU" : "RU") : ActiveFront =~ "B|DN" ? "RU" : ActiveFront == "F" ? "AU" : "BR"}')])
+           + gp('EobZones', '', [("this Front's Army boxes", CALC, by_front({f: '"%s"' % z for f, z in ARMY_ZONES.items()}, '""'))])
+           + gp('mMajorBattle', 'Major Battle', [], 'a61: VP report prefix'))
+    gps = gps.replace('propChanger="P,(ActiveFront', 'propChanger="P,{(ActiveFront').replace(' : &quot;&quot;)" propertyGate', ' : &quot;&quot;)}" propertyGate')
+    anchor = '<VASSAL.build.module.properties.GlobalProperty description="button control" initialValue="true" isNumeric="false" max="null" min="null" name="LockCOwithdraw"'
+    raw = replace_once(raw, anchor, gps + anchor)
+
+    # Withdraw buttons record who withdrew
+    for side, key in (('France', '59141\\,0\\,eobFRwd'), ('Coalition', '59142\\,0\\,eobCOwd')):
+        w = re.search(r'<VASSAL\.build\.module\.DoActionButton [^>]*name="Withdraw \(%s\)"[^>]*/>' % side, raw).group(0)
+        raw = replace_once(raw, w, w.replace('hotkeys="57514\\,0\\,withdrawDRM"', 'hotkeys="57514\\,0\\,withdrawDRM,' + key + '"'))
+
+    FR, CO = 'mFR', 'mCO'
+    win = '(EobWinner == "FR" ? mFR : mCO)'
+    lose = '(EobWinner == "FR" ? mCO : mFR)'
+    wd = '(EobWithdrew == "FR" ? mFR : mCO)'
+    nwd = '(EobWithdrew == "FR" ? mCO : mFR)'
+    loss = lambda n: '%s + (%s == 1 ? " loss" : " losses")' % (n, n)
+    r1 = ('{"<b>End of battle, Front " + ActiveFront + ":</b> " + mFR + " inflicts " + ' + loss('EobHitsFR') + ' + ", " + mCO + '
+          '" inflicts " + ' + loss('EobHitsCO') + ' + " (battle track) [13.4.4]. " + (EobWithdrew != "" ? "<b>" + ' + wd +
+          ' + " withdrew.</b>" : EobWinner == "draw" ? "<b>Draw.</b>" : "<b>" + ' + win + ' + " wins.</b>") + '
+          '" Remove units: " + mFR + " " + EobHitsCO + ", " + mCO + " " + EobHitsFR + "."}')
+    starts = '" + mFR + " " + EobUnitsFR + " units, " + mCO + " " + EobUnitsCO + " at the start'
+    r2 = ('{EobMajor ? "<b>Major Battle</b> (' + starts + '" + (EobVP == 2 ? ", Napoleon card played" : "") + "): " + ' + win +
+          ' + " +" + EobVP + " VP, " + ' + lose + ' + " -" + EobVP + " VP, applied below [13.4.6]." : '
+          'ActiveFront == "G" ? "War of 1812 Box: never a Major Battle, no VP [13.4.6]." : '
+          'EobWithdrew != "" ? "No Major Battle VP after a withdrawal [13.4.6]. If the Napoleon, Kutuzov or Blücher card was '
+          'played against the withdrawing Army, its owner gains 1 VP (by hand) [13.4.2]." : '
+          'EobWinner == "draw" ? "Draw: no Major Battle VP [13.4.6]." : '
+          '"Minor battle (' + starts + '; 4 each needed): no VP [13.4.6]."}')
+    hold = ' lost by exactly one while defending in the mountains: it may hold them (Battle menu) before any Army moves [13.4.5]."'
+    r3 = '{!LockFRhold ? "<b>" + mFR + "</b>' + hold + ' : !LockCOhold ? "<b>" + mCO + "</b>' + hold + ' : ""}'
+    r4 = ('{EobWithdrew != "" ? ' + wd + ' + " withdrew: it retreats one space if it was defending or both sides had Military '
+          'Operations, otherwise it stays in its space. " + ' + nwd + ' + " advances into a vacated space if it has a Military '
+          'Operation [13.4.2]." : EobWinner == "draw" ? "Draw: the defending Army stays in place, no Army moves [13.4.5]." : '
+          '(EobWinner == "FR" ? EobFRatk : EobCOatk) ? ' + lose + ' + " retreats one space to its rear and " + ' + win +
+          ' + " advances into it, unless the mountains are held. Allied Armies in their Front Start Space and the Grande Armée '
+          'in Paris do not retreat; the War of 1812 Box has no advance [13.4.5]." : ' + win +
+          ' + " beat off the attack: no Army moves [13.4.5]."}')
+    r5 = ('{"Move the Army blocks and adjust space VPs for any change of control by hand [13.5]. Then Battle menu &gt; '
+          '<i>Return markers: battle over</i> [13.4.6]."}')
+
+    def keybtn(name, key, rpt, hotkeys=''):
+        return ('<VASSAL.build.module.DoActionButton canDisable="false" disabledIcon="" doHotkey="%s" doLoop="false" '
+                'doReport="true" doSound="false" hideWhenDisabled="false" hotkey="%s" hotkeys="%s" icon="" index="false" '
+                'indexProperty="" indexStart="1" indexStep="1" loopCount="1" loopType="counted" name="a61: %s" '
+                'postLoopKey="" preLoopKey="" propertyGate="" reportFormat="%s" soundClip="" text="" tooltip="" '
+                'untilExpression="" whileExpression=""/>') % ('true' if hotkeys else 'false', key, hotkeys, name, attr(rpt))
+
+    def menubtn(text, gate, hotkeys, rpt=''):
+        return ('<VASSAL.build.module.DoActionButton canDisable="true" disabledIcon="toolbarSpace-w02.png" doHotkey="true" '
+                'doLoop="false" doReport="%s" doSound="false" hideWhenDisabled="false" hotkey="" hotkeys="%s" icon="" '
+                'index="false" indexProperty="" indexStart="1" indexStep="1" loopCount="1" loopType="counted" name="a61: %s" '
+                'postLoopKey="" preLoopKey="" propertyGate="%s" reportFormat="%s" soundClip="" text="%s" tooltip="" '
+                'untilExpression="" whileExpression=""/>') % ('true' if rpt else 'false', hotkeys, text, gate, attr(rpt), text)
+
+    def gkc(name, key, hotkey, target, flt, params=''):
+        return ('<VASSAL.build.module.GlobalKeyCommand buttonHotkey="%s" buttonText="" canDisable="false" deckCount="0" '
+                'disabledIcon="" filter="%s" hideWhenDisabled="false" hotkey="%s" icon="" name="a61: %s" parameters="%s" '
+                'propertyGate="" reportFormat="" reportSingle="false" singleMap="true" suppressSounds="true" target="%s" '
+                'tooltip=""/>') % (key, attr(flt), hotkey, name, attr(params), target)
+
+    seq = ','.join(k.replace(',', '\\,') for k in (
+        READ, CALC, '59144,0,eobR1', '59145,0,eobR2', '59146,0,eobR3', '59147,0,eobR4', '59148,0,eobR5',
+        '59149,0,eobVP', '59150,0,eobDone'))
+    vp_target = 'MODULE|true|MAP|$map$||||0|0||true|BasicName|(French\\|Austrian\\|Russian\\|British) VP|MATCH||'
+    map_target = 'MODULE|true|MAP|$map$||||0|0||false|||EQUALS||'
+    vp_param = 'prefixProp:mMajorBattle,incVP:{EobWinner == "%s" ? EobVP \\: 0 - EobVP}'
+    ret_rpt = ('{"<b>Front " + ActiveFront + " battle over:</b> its Military Operations go back to the Diplomacy Display and '
+               'its Military Support markers to the Force Pools [13.4.6]."}')
+    ret = ','.join(k.replace(',', '\\,') for k in ('59151,0,eobRetMO', '59152,0,eobRetMS', '59153,0,eobReturned'))
+    els = [
+        menubtn('End of battle: read the battle track', 'EobLock', seq),
+        keybtn('End of battle - result and losses', '59144,0,eobR1', r1),
+        keybtn('End of battle - Major Battle VP', '59145,0,eobR2', r2),
+        keybtn('End of battle - mountain hold', '59146,0,eobR3', r3),
+        keybtn('End of battle - advance and retreat', '59147,0,eobR4', r4),
+        keybtn('End of battle - next step', '59148,0,eobR5', r5),
+        gkc('Major Battle VP - France', '59149,0,eobVP', '57983,0,addVP', vp_target, '{EobMajor && sideCode == "FR"}', vp_param % 'FR'),
+        gkc('Major Battle VP - Coalition', '59149,0,eobVP', '57983,0,addVP', vp_target,
+            '{EobMajor && sideCode =~ EobCOsides}', vp_param % 'CO'),
+        menubtn('Return markers: battle over', 'EobReturnLock', ret, ret_rpt),
+        gkc("Return this Front's Military Operations", '59151,0,eobRetMO', '57354,0,gohome', map_target,
+            '{BasicName =~ ".*Military Operation.*" && CurrentZone =~ EobZones}'),
+        gkc("Return this Front's Military Support", '59152,0,eobRetMS', '57912,0,ms2pool', map_target,
+            '{BasicName =~ ".*Military Support" && CurrentZone =~ EobZones}'),
+    ]
+    w = re.search(r'<VASSAL\.build\.module\.DoActionButton [^>]*name="Withdraw \(Coalition\)"[^>]*/>', raw).group(0)
+    raw = replace_once(raw, w, w + ''.join('\n            ' + e for e in els))
+    return replace_once(raw, 'Coalition Withdraws!,France holds the mountains,Coalition holds the mountains,',
+                        'Coalition Withdraws!,End of battle: read the battle track,France holds the mountains,'
+                        'Coalition holds the mountains,Return markers: battle over,')
+
+
 def version(raw):
     old = 'nextPieceSlotId="3804" version="2.0.0a60"'
     if old not in raw:
@@ -331,7 +515,8 @@ def version(raw):
     return replace_once(raw, old, 'nextPieceSlotId="3804" version="2.0.0a61"')
 
 
-FIXES = [env_second_die_after_draw, milop_restrictions, battle_cards_from_every_hand, paired_fronts, mountain_hold, version]
+FIXES = [env_second_die_after_draw, milop_restrictions, battle_cards_from_every_hand, paired_fronts, mountain_hold,
+         end_of_battle, version]
 
 if __name__ == '__main__':
     raw = open(BF, encoding='utf-8').read()
