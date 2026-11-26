@@ -375,6 +375,17 @@ def end_of_battle(raw):
                 + '            </VASSAL.build.module.properties.GlobalProperty>\n            ')
 
     INIT, CALC, READ = '57482,0,initDRM', '59143,0,eobCalc', '59140,0,eobRead'
+    CALC2, CALC3, CALC4, CALC5 = '59154,0,eobCalc2', '59155,0,eobCalc3', '59156,0,eobCalc4', '59157,0,eobCalc5'
+    # Space VPs [13.5] as printed on the map: black (both sides) or in one Major Power's colour (that power only).
+    # Castile's 2VP* and Naples' 2VP-dagger (AU) are end-of-turn VPs [14.0], not control VPs.
+    SPACE_VP = [('Poland', 2, ''), ('Silesia', 4, 'RU'), ('Saxony', 3, ''), ('Bavaria', 3, ''), ('Alsace', 3, ''),
+                ('Prussia', 4, 'RU'), ('Hanover', 3, ''), ('Belgium', 4, ''), ('Scheldt', 3, 'BR'),
+                ('Gascony', 2, ''), ('Toulouse', 5, ''), ('Valencia', 2, ''), ('Catalonia', 2, ''),
+                ('Naples', 3, 'BR'), ('Venice', 2, 'AU'), ('Italy', 2, ''), ('Lyon', 3, '')]
+    space_vp = ' : '.join('EobSpace == "%s" ? %d' % (z, v) for z, v, o in SPACE_VP) + ' : 0'
+    space_owner = ' : '.join('EobSpace == "%s" ? "%s"' % (z, o) for z, v, o in SPACE_VP if o) + ' : ""'
+    co_block = by_front({'A': 'FrontARU', 'B': '(MilOpBBR > 0 && MilOpBRU == 0 ? FrontBBR : FrontBRU)', 'C': 'FrontCBR',
+                         'D': 'FrontDBR', 'E': 'FrontEBR', 'F': 'FrontFAU'}, '""')
     hits = {s: ' + '.join('%d * CountZone("DRM Track %d", map, "{BasicName == \\"%s Battle DRM Pawn\\"}")' % (n, n, p)
                           for n in range(1, 6))
             for s, p in (('FR', 'French'), ('CO', 'Coalition'))}
@@ -416,7 +427,16 @@ def end_of_battle(raw):
            + gp('EobCOsides', 'RU', [('Coalition powers scoring this Front', CALC,
                                       '{ActiveFront == "A" ? (WarState == 2 ? "RU|AU" : "RU") : ActiveFront =~ "B|DN" ? "RU" : ActiveFront == "F" ? "AU" : "BR"}')])
            + gp('EobZones', '', [("this Front's Army boxes", CALC, by_front({f: '"%s"' % z for f, z in ARMY_ZONES.items()}, '""'))])
-           + gp('mMajorBattle', 'Major Battle', [], 'a61: VP report prefix'))
+           + gp('mMajorBattle', 'Major Battle', [], 'a61: VP report prefix')
+           + gp('EobHeld', 'false', [('battle start', INIT, 'false'), ('mountains held', '59136,0,usedMountainHold', 'true')])
+           + gp('EobLoser', '', [('the side that lost or withdrew', CALC2, '{EobWithdrew != "" ? EobWithdrew : EobWinner == "FR" ? "CO" : EobWinner == "CO" ? "FR" : ""}')])
+           + gp('EobTaker', '', [('the side that may take the space', CALC3, '{EobLoser == "FR" ? "CO" : EobLoser == "CO" ? "FR" : ""}')])
+           + gp('EobSpace', '', [("the loser's space, taken when the other side has a Military Operation", CALC4,
+                                  '{EobTaker == "" || EobHeld ? "" : !(EobTaker == "FR" ? EobFRatk : EobCOatk) ? "" : '
+                                  'EobLoser == "FR" ? GetProperty("Front" + ActiveFront + "FR") : ' + co_block + '}')])
+           + gp('EobSpaceVP', '0', [('space VP [13.5]', CALC5, '{' + space_vp + '}')])
+           + gp('EobSpaceOwner', '', [('coloured space VP owner, empty when black', CALC5, '{' + space_owner + '}')])
+           + gp('mSpaceControl', '', [('VP report prefix', CALC5, '{EobSpace + " changes hands"}')], 'a61: VP report prefix'))
     gps = gps.replace('propChanger="P,(ActiveFront', 'propChanger="P,{(ActiveFront').replace(' : &quot;&quot;)" propertyGate', ' : &quot;&quot;)}" propertyGate')
     anchor = '<VASSAL.build.module.properties.GlobalProperty description="button control" initialValue="true" isNumeric="false" max="null" min="null" name="LockCOwithdraw"'
     raw = replace_once(raw, anchor, gps + anchor)
@@ -453,7 +473,8 @@ def end_of_battle(raw):
           ' + " advances into it, unless the mountains are held. Allied Armies in their Front Start Space and the Grande Armée '
           'in Paris do not retreat; the War of 1812 Box has no advance [13.4.5]." : ' + win +
           ' + " beat off the attack: no Army moves [13.4.5]."}')
-    r5 = ('{"Move the Army blocks and adjust space VPs for any change of control by hand [13.5]. Then Battle menu &gt; '
+    r5 = ('{"Move the Army blocks [13.4.5]." + (EobSpaceVP > 0 ? " " + EobSpace + " changes hands: its " + EobSpaceVP + '
+          '" VP [13.5] are applied with the next step, unless the mountains are held." : "") + " Then Battle menu &gt; '
           '<i>Return markers: battle over</i> [13.4.6]."}')
 
     def keybtn(name, key, rpt, hotkeys=''):
@@ -477,14 +498,16 @@ def end_of_battle(raw):
                 'tooltip=""/>') % (key, attr(flt), hotkey, name, attr(params), target)
 
     seq = ','.join(k.replace(',', '\\,') for k in (
-        READ, CALC, '59144,0,eobR1', '59145,0,eobR2', '59146,0,eobR3', '59147,0,eobR4', '59148,0,eobR5',
+        READ, CALC, CALC2, CALC3, CALC4, CALC5, '59144,0,eobR1', '59145,0,eobR2', '59146,0,eobR3', '59147,0,eobR4', '59148,0,eobR5',
         '59149,0,eobVP', '59150,0,eobDone'))
     vp_target = 'MODULE|true|MAP|$map$||||0|0||true|BasicName|(French\\|Austrian\\|Russian\\|British) VP|MATCH||'
     map_target = 'MODULE|true|MAP|$map$||||0|0||false|||EQUALS||'
     vp_param = 'prefixProp:mMajorBattle,incVP:{EobWinner == "%s" ? EobVP \\: 0 - EobVP}'
     ret_rpt = ('{"<b>Front " + ActiveFront + " battle over:</b> its Military Operations go back to the Diplomacy Display and '
-               'its Military Support markers to the Force Pools [13.4.6]."}')
-    ret = ','.join(k.replace(',', '\\,') for k in ('59151,0,eobRetMO', '59152,0,eobRetMS', '59153,0,eobReturned'))
+               'its Military Support markers to the Force Pools [13.4.6]." + (EobSpaceVP > 0 && !EobHeld ? " " + EobSpace + '
+               '" changes hands: space VPs follow [13.5]." : "")}')
+    ret = ','.join(k.replace(',', '\\,') for k in ('59159,0,eobRetR', '59158,0,eobSpaceVP', '59151,0,eobRetMO', '59152,0,eobRetMS', '59153,0,eobReturned'))
+    sp_param = 'prefixProp:mSpaceControl,incVP:{EobTaker == "%s" ? EobSpaceVP \\: 0 - EobSpaceVP}'
     els = [
         menubtn('End of battle: read the battle track', 'EobLock', seq),
         keybtn('End of battle - result and losses', '59144,0,eobR1', r1),
@@ -495,7 +518,12 @@ def end_of_battle(raw):
         gkc('Major Battle VP - France', '59149,0,eobVP', '57983,0,addVP', vp_target, '{EobMajor && sideCode == "FR"}', vp_param % 'FR'),
         gkc('Major Battle VP - Coalition', '59149,0,eobVP', '57983,0,addVP', vp_target,
             '{EobMajor && sideCode =~ EobCOsides}', vp_param % 'CO'),
-        menubtn('Return markers: battle over', 'EobReturnLock', ret, ret_rpt),
+        menubtn('Return markers: battle over', 'EobReturnLock', ret),
+        keybtn('Return markers - report', '59159,0,eobRetR', ret_rpt),
+        gkc('Space VP - France', '59158,0,eobSpaceVP', '57983,0,addVP', vp_target,
+            '{EobSpaceVP > 0 && !EobHeld && EobSpaceOwner == "" && sideCode == "FR"}', sp_param % 'FR'),
+        gkc('Space VP - Coalition', '59158,0,eobSpaceVP', '57983,0,addVP', vp_target,
+            '{EobSpaceVP > 0 && !EobHeld && sideCode =~ (EobSpaceOwner == "" ? EobCOsides : EobSpaceOwner)}', sp_param % 'CO'),
         gkc("Return this Front's Military Operations", '59151,0,eobRetMO', '57354,0,gohome', map_target,
             '{BasicName =~ ".*Military Operation.*" && CurrentZone =~ EobZones}'),
         gkc("Return this Front's Military Support", '59152,0,eobRetMS', '57912,0,ms2pool', map_target,
