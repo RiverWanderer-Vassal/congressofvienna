@@ -67,6 +67,15 @@ def env_second_die_after_draw(raw):
 
 
 # ---------------------------------------------------------------------------------------------
+# Paired fronts [13.6.1], as printed on the map. Front C waits on Front D, whose battle comes later in the turn,
+# so a British Front C attack whose prerequisite is not already met is refused at placement. Front B waits on
+# Front A, whose battle comes first, so a Russian Front B placement is allowed with a warning and the Front B
+# battle start reports when Saxony is still not occupied.
+PAIRED_CD = ('(FrontTrack == "C" && sideCode == "BR" && FrontDBR != "" && '
+             '((FrontCBR == "Castile" && FrontDBR !~ "Valencia|Catalonia|Pyrenees") || '
+             '(FrontCBR == "Gascony" && FrontDBR !~ "Catalonia|Pyrenees")))')
+NO_SAXONY = '(FrontARU !~ "Saxony|Bavaria|Alsace|Paris" && FrontAAU !~ "Saxony|Bavaria|Alsace|Paris")'
+
 MO_BLOCK = ('{CurrentZone == "Paris" || FrontTrack == "" || CapitalCode != "" ? "" : '
     '(FrontTrack =~ "A|B" && sideCode =~ "FR|RU" && WarState == 1) || (FrontTrack == "DN" && WarState == 1) ? '
     '"The Armistice is in effect: no Military Operation on Front A, Front B or in Denmark/Norway [13.1]." : '
@@ -81,7 +90,10 @@ MO_BLOCK = ('{CurrentZone == "Paris" || FrontTrack == "" || CapitalCode != "" ? 
     'FrontTrack == "G" && sideCode =~ "FR|BR" && CountZone(ZoneG, map, sideCode == "FR" ? "FRdrm" : "COdrm") == 0 ? '
     '"A Military Operation in the War of 1812 Box needs at least one of your units or fleets there [13.1]." : '
     'FrontTrack == "DN" && (CountZone(ZoneDN, map, "COdrm") == 0 || CountZone(ZoneDN, map, "FRdrm") == 0) ? '
-    '"A Military Operation in Denmark/Norway needs units of both sides there." : ""}')
+    '"A Military Operation in Denmark/Norway needs units of both sides there." : '
+    + PAIRED_CD + ' ? (FrontCBR == "Castile" ? '
+    '"The Coalition must occupy Valencia (Front D) before Britain can attack Gascony [13.6.1.2]." : '
+    '"The Coalition must occupy Catalonia (Front D) before Britain can attack Toulouse [13.6.1.2].") : ""}')
 
 
 def milop_restrictions(raw):
@@ -201,7 +213,55 @@ OLD_SEND_CODES = {
 }
 
 
-FIXES = [env_second_die_after_draw, milop_restrictions, battle_cards_from_every_hand]
+def paired_fronts(raw):
+    """Paired fronts [13.6.1], printed on the map: Hanover needs Saxony occupied (Front A), Gascony needs
+    Valencia and Toulouse needs Catalonia (Front D). Front C is refused at placement through moBlock (see
+    PAIRED_CD); this adds the same Disable on the British Front C right-click command, a warning when a
+    Russian Military Operation is placed on Front B to attack Hanover without Saxony, and a red report at
+    the Front B battle start if Saxony is still not occupied (the attack cannot be carried out [13.6.1.4])."""
+    if 'Paired front B warning (a61)' in raw:
+        return None
+    # BR right-click Front C
+    m, pid, t, s = prototype(raw, 'BR Military Operation')
+    j = index_of(t, 'hideCmd;Only 1;Disable;MilOpCBR > 0;')
+    cond = PAIRED_CD.replace('FrontTrack == "C" && sideCode == "BR" && ', '')
+    t.insert(j + 1, 'hideCmd;Paired fronts C/D [13.6.1.2];Disable;{' + cond + '};57870\\,0\\,goC')
+    s.insert(j + 1, '')
+    raw = put_prototype(raw, m, pid, t, s)
+    # Russian Front B placement warning (fires on a valid registration)
+    m, pid, t, s = prototype(raw, 'Military Operation Placement')
+    j = index_of(t, 'PROP;moBlockMsg;')
+    warn = '{Alert("Allowed, but the Russian attack on Hanover can only be carried out if the Coalition occupies Saxony when Front B is fought (Front A is fought first) [13.6.1.1].")}'
+    t.insert(j + 1, seq_encode(['PROP', 'moWarnB', 'false,0,100,false',
+        seq_encode([seq_encode(['', '59122,0,warnMOpairedB', seq_encode(['P', warn], ',')], ':')], ','),
+        'a61: paired front warning'], ';'))
+    s.insert(j + 1, '')
+    j = index_of(t, 'macro;Rule restriction (a61);')
+    t.insert(j + 1, 'macro;Paired front B warning (a61);;57859,0,register;{FrontTrack == "B" && sideCode == "RU" && '
+             'FrontBRU == "Pomerania" && ' + NO_SAXONY + '};;59122\\,0\\,warnMOpairedB;false;;;counted;;;;false;;1;1')
+    s.insert(j + 1, '')
+    raw = put_prototype(raw, m, pid, t, s)
+    # Front B battle start report
+    rpt = ('{MilOpBRU > 0 && FrontBRU == "Pomerania" && ' + NO_SAXONY + ' ? "<font color=red><b>The Coalition does not '
+           'occupy Saxony: the Russian attack on Hanover cannot be carried out. Return the Russian Military Operation '
+           'to the Diplomacy Display [13.6.1.1, 13.6.1.4].</b></font>" : ""}')
+    btn = ('<VASSAL.build.module.DoActionButton canDisable="false" disabledIcon="" doHotkey="false" doLoop="false" '
+           'doReport="true" doSound="false" hideWhenDisabled="false" hotkey="57370,0,setFrontB" hotkeys="" icon="" '
+           'index="false" indexProperty="" indexStart="1" indexStep="1" loopCount="1" loopType="counted" '
+           'name="a61: Paired fronts - Front B attack on Hanover needs Saxony [13.6.1.1]" postLoopKey="" preLoopKey="" '
+           'propertyGate="" reportFormat="' + attr(rpt) + '" soundClip="" text="" tooltip="" untilExpression="" whileExpression=""/>')
+    anchor = '<VASSAL.build.module.ToolbarMenu canDisable="false" description="Battle Fronts &amp; utilities"'
+    return replace_once(raw, anchor, btn + '\n            ' + anchor)
+
+
+def version(raw):
+    old = 'nextPieceSlotId="3804" version="2.0.0a60"'
+    if old not in raw:
+        return None
+    return replace_once(raw, old, 'nextPieceSlotId="3804" version="2.0.0a61"')
+
+
+FIXES = [env_second_die_after_draw, milop_restrictions, battle_cards_from_every_hand, paired_fronts, version]
 
 if __name__ == '__main__':
     raw = open(BF, encoding='utf-8').read()
