@@ -280,6 +280,50 @@ def paired_fronts(raw):
     ind = '\n            '
     return raw.replace(e, menu + ind + gkc + ind + chk + ind + hidden)
 
+def mountain_hold(raw):
+    """Battle menu: "France holds the mountains" / "Coalition holds the mountains" [13.4.5 Canceling a Retreat].
+    Offered only when the current battle's defender is in a mountain space (the attacker's mountain malus,
+    MountainCO / MountainFR, is -3) and nobody withdrew. The players confirm the conditions the module does not
+    track (losses differ by exactly one, at least one unit remains); pressing it logs the extra loss and the
+    cancelled retreat and locks both items until the next battle."""
+    if 'name="LockFRhold"' in raw:
+        return None
+    def gp(name, side_mtn):
+        on = '{!(ActiveFront =~ "A|C|D|F" && %s == -3)}' % side_mtn
+        return ('<VASSAL.build.module.properties.GlobalProperty description="a61: mountain hold button control" '
+                'initialValue="true" isNumeric="false" max="null" min="null" name="%s" wrap="false">\n'
+                '                <VASSAL.build.module.properties.ChangePropertyButton canDisable="false" desc="battle start: '
+                'open if this side defends in a mountain space" disabledIcon="" hideWhenDisabled="false" '
+                'hotkey="57482,0,initDRM" icon="" propChanger="P,%s" propertyGate="" reportFormat="" text="" tooltip=""/>\n'
+                '                <VASSAL.build.module.properties.ChangePropertyButton canDisable="false" desc="no hold after a '
+                'withdrawal" disabledIcon="" hideWhenDisabled="false" hotkey="57514,0,withdrawDRM" icon="" '
+                'propChanger="P,true" propertyGate="" reportFormat="" text="" tooltip=""/>\n'
+                '                <VASSAL.build.module.properties.ChangePropertyButton canDisable="false" desc="locked after use" '
+                'disabledIcon="" hideWhenDisabled="false" hotkey="59136,0,usedMountainHold" icon="" propChanger="P,true" '
+                'propertyGate="" reportFormat="" text="" tooltip=""/>\n'
+                '            </VASSAL.build.module.properties.GlobalProperty>\n            ') % (name, attr(on))
+    anchor = '<VASSAL.build.module.properties.GlobalProperty description="button control" initialValue="true" isNumeric="false" max="null" min="null" name="LockCOwithdraw"'
+    raw = replace_once(raw, anchor, gp('LockFRhold', 'MountainCO') + gp('LockCOhold', 'MountainFR') + anchor)
+    tail = (' loses one more unit to hold the mountains: the retreat is cancelled and the attacking Army stays in its '
+            'space [13.4.5]. Only allowed when the losses differ by exactly one and at least one unit remains.</b>')
+    def btn(text, gate, rpt):
+        return ('<VASSAL.build.module.DoActionButton canDisable="true" disabledIcon="toolbarSpace-w02.png" doHotkey="true" '
+                'doLoop="false" doReport="true" doSound="false" hideWhenDisabled="false" hotkey="" '
+                'hotkeys="59136\\,0\\,usedMountainHold" icon="" index="false" indexProperty="" indexStart="1" indexStep="1" '
+                'loopCount="1" loopType="counted" name="a61: %s" postLoopKey="" preLoopKey="" propertyGate="%s" '
+                'reportFormat="%s" soundClip="" text="%s" tooltip="" untilExpression="" whileExpression=""/>') % (
+                text, gate, attr(rpt), text)
+    fr = btn('France holds the mountains', 'LockFRhold',
+             '{"<b><i>" + mFR + "</i> (" + GetProperty("Front" + ActiveFront + "FR") + ")' + tail + '"}')
+    co = btn('Coalition holds the mountains', 'LockCOhold',
+             '{"<b><i>" + mCO + "</i> (" + GetProperty("Front" + ActiveFront + (ActiveFront == "A" ? "RU" : '
+             'ActiveFront == "F" ? "AU" : "BR")) + ")' + tail + '"}')
+    w = re.search(r'<VASSAL\.build\.module\.DoActionButton [^>]*name="Withdraw \(Coalition\)"[^>]*/>', raw)
+    assert w and raw.count(w.group(0)) == 1
+    raw = raw.replace(w.group(0), w.group(0) + '\n            ' + fr + '\n            ' + co)
+    return replace_once(raw, 'Coalition Withdraws!,', 'Coalition Withdraws!,France holds the mountains,Coalition holds the mountains,')
+
+
 def version(raw):
     old = 'nextPieceSlotId="3804" version="2.0.0a60"'
     if old not in raw:
@@ -287,7 +331,7 @@ def version(raw):
     return replace_once(raw, old, 'nextPieceSlotId="3804" version="2.0.0a61"')
 
 
-FIXES = [env_second_die_after_draw, milop_restrictions, battle_cards_from_every_hand, paired_fronts, version]
+FIXES = [env_second_die_after_draw, milop_restrictions, battle_cards_from_every_hand, paired_fronts, mountain_hold, version]
 
 if __name__ == '__main__':
     raw = open(BF, encoding='utf-8').read()
