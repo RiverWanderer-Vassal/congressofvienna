@@ -474,7 +474,7 @@ def end_of_battle(raw):
           'in Paris do not retreat; the War of 1812 Box has no advance [13.4.5]." : ' + win +
           ' + " beat off the attack: no Army moves [13.4.5]."}')
     r5 = ('{"Move the Army blocks [13.4.5]." + (EobSpaceVP > 0 ? " " + EobSpace + " changes hands: its " + EobSpaceVP + '
-          '" VP [13.5] are applied with the next step, unless the mountains are held." : "") + " Then Battle menu &gt; '
+          '" VP [13.5] follow when the Army blocks are moved, unless the mountains are held." : "") + " Then Battle menu &gt; '
           '<i>Return markers: battle over</i> [13.4.6]."}')
 
     def keybtn(name, key, rpt, hotkeys=''):
@@ -505,7 +505,7 @@ def end_of_battle(raw):
     vp_param = 'prefixProp:mMajorBattle,incVP:{EobWinner == "%s" ? EobVP \\: 0 - EobVP}'
     ret_rpt = ('{"<b>Front " + ActiveFront + " battle over:</b> its Military Operations go back to the Diplomacy Display and '
                'its Military Support markers to the Force Pools [13.4.6]." + (EobSpaceVP > 0 && !EobHeld ? " " + EobSpace + '
-               '" changes hands: space VPs follow [13.5]." : "")}')
+               '" changes hands: its space VPs follow the Army block moves [13.5]." : "")}')
     ret = ','.join(k.replace(',', '\\,') for k in ('59159,0,eobRetR', '59158,0,eobSpaceVP', '59151,0,eobRetMO', '59152,0,eobRetMS', '59153,0,eobReturned'))
     sp_param = 'prefixProp:mSpaceControl,incVP:{EobTaker == "%s" ? EobSpaceVP \\: 0 - EobSpaceVP}'
     els = [
@@ -561,15 +561,103 @@ def free_milop_to_paris(raw):
                         + ind + gkc('free French Mil Op from the Negotiation Table', '59161,0,freeMOtable', 'TableZone'))
 
 
+# ---------------------------------------------------------------------------------------------
+# Space VPs on Army block moves [13.5], a63 (Mark, 27 Nov 2026): moving the Army blocks is what applies space VPs
+# once the game has started, the same way it already updates hand sizes. a61/a62 applied them at "Return markers".
+# Pattern already in the module for Front A (and for the cards): each Front space carries, as zone properties, the
+# VP total a Major Power holds on that Front when its block stands there. VPFR: black VPs of the spaces France
+# controls (its step and below). VPRU/VPAU/VPBR: black plus own-colour VPs of the spaces the Coalition power
+# controls (its step and above). Austria (Army of Bohemia) on Front A scores the black spaces only [13.5].
+# A block that moves scores (value of the space entered) - (value of the space left) for its own side; the paired
+# block it pushes does the same, so both sides change together. Paris and the French B/C/F home boxes count 0 for
+# France (Paris is always French-controlled [13.6.5]); a Coalition block in Paris, Vienna or a home box, and the
+# French D/E home boxes, change nothing. The Grande Armee's automatic move into Paris [13.6.5] is a block move too,
+# so the Track A spaces it abandons are scored as captured, as the Paris rule says.
+FRONT_VP = {  # zone: {side: total}
+    'Polesia': {'AU': 0}, 'Poland': {'AU': 2}, 'Silesia': {'AU': 2}, 'Saxony': {'AU': 5}, 'Bavaria': {'AU': 8},
+    'Alsace': {'AU': 11},
+    'Lithuania': {'FR': 7, 'RU': 0}, 'East Prussia': {'FR': 7, 'RU': 0}, 'Prussia': {'FR': 7, 'RU': 4},
+    'Pomerania': {'FR': 7, 'RU': 4}, 'Hanover': {'FR': 7, 'RU': 7}, 'Holland': {'FR': 4, 'RU': 7},
+    'Belgium': {'FR': 4, 'RU': 11},
+    'Portugal': {'FR': 7, 'BR': 0}, 'Leon': {'FR': 7, 'BR': 0}, 'Castile': {'FR': 7, 'BR': 0},
+    'Gascony': {'FR': 7, 'BR': 2}, 'Toulouse': {'FR': 5, 'BR': 7},
+    'Southern Spain': {'FR': 4, 'BR': 0}, 'Valencia': {'FR': 4, 'BR': 2}, 'Catalonia': {'FR': 2, 'BR': 4},
+    'Pyrenees': {'FR': 0, 'BR': 4},
+    'Sicily': {'FR': 0, 'BR': 0}, 'Naples': {'FR': 0, 'BR': 3},
+    'Tyrol': {'FR': 5, 'AU': 0}, 'Venice': {'FR': 5, 'AU': 2}, 'Italy': {'FR': 5, 'AU': 4}, 'Alps': {'FR': 3, 'AU': 4},
+    'Lyon': {'FR': 3, 'AU': 7},
+}
+
+
+def space_vp_on_block_move(raw):
+    if 'name="mArmyMove"' in raw:
+        return None
+    # 1. zone properties
+    zp = ('<VASSAL.build.module.properties.ZoneProperty description="a63: %s VP held on this Front with its block here [13.5]" '
+          'initialValue="%d" isNumeric="false" max="null" min="null" name="VP%s" wrap="false"/>')
+    for zone, vals in FRONT_VP.items():
+        pat = re.compile(r'(<VASSAL\.build\.module\.map\.boardPicker\.board\.mapgrid\.Zone [^>]*\bname="%s"[^>]*>)(.*?)'
+                         r'(\s*</VASSAL\.build\.module\.map\.boardPicker\.board\.mapgrid\.Zone>)' % re.escape(zone), re.S)
+        hits = list(pat.finditer(raw))
+        assert len(hits) == 1, (zone, len(hits))
+        h = hits[0]
+        body = h.group(2)
+        ind = re.search(r'\n(\s*)<VASSAL\.build\.module\.properties\.ZoneProperty', body).group(1)
+        for side, v in vals.items():
+            assert 'name="VP%s"' % side not in body, (zone, side)
+            body += '\n' + ind + zp % (side, v, side)
+        raw = raw[:h.start(2)] + body + raw[h.end(2):]
+    # 2. the report prefix
+    anchor = '<VASSAL.build.module.properties.GlobalProperty description="a61: VP report prefix" initialValue="" isNumeric="false" max="null" min="null" name="mSpaceControl"'
+    raw = replace_once(raw, anchor, '<VASSAL.build.module.properties.GlobalProperty description="a63: VP report prefix for Army '
+                       'block moves" initialValue="" isNumeric="false" max="null" min="null" name="mArmyMove" wrap="false"/>\n            ' + anchor)
+    # 3. Army prototype: on entry, after reset, work out the change and send it to this side's VP marker
+    m, pid, t, s = prototype(raw, 'Army')
+    i = index_of(t, 'macro;Common entry point for setting up army block on a drag')
+    old = '57993\\,0\\,chkDropPoint,57352\\,0\\,reset;'
+    assert t[i].count(old) == 1
+    t[i] = t[i].replace(old, '57993\\,0\\,chkDropPoint,57352\\,0\\,reset,59170\\,0\\,a63vpCalc,59171\\,0\\,a63vpCalc2,59172\\,0\\,a63vpGo;')
+    def vp_at(zone):
+        return ('(%s == "Paris" || (sideCode == "FR" && armyFront =~ "B|C|F" && ("" + GetZoneProperty("IsArmyZone", %s, CurrentMap)) == "true") '
+                '? (sideCode == "FR" ? 0 : -99) : ("" + GetZoneProperty("FrontTrack", %s, CurrentMap)) == armyFront '
+                '&& ("" + GetZoneProperty("VP" + sideCode, %s, CurrentMap)) != "" ? GetZoneProperty("VP" + sideCode, %s, CurrentMap) : -99)') % (zone, zone, zone, zone, zone)
+    def prop(name, key, expr, desc):
+        return seq_encode(['PROP', name, 'false,0,100,false',
+                           seq_encode([seq_encode(['', key, seq_encode(['P', expr], ',')], ':')], ','), desc], ';')
+    gate = 'GameStarted && Phase >= Conference && OldZone != CurrentZone && vpOld > -99 && vpNew > -99'
+    new = [
+        prop('vpOld', '59170,0,a63vpCalc', '{' + vp_at('OldZone') + '}',
+             'a63: VP this side held on the Front from the space left (-99: no change) [13.5]'),
+        prop('vpNew', '59170,0,a63vpCalc', '{' + vp_at('CurrentZone') + '}',
+             'a63: VP this side holds on the Front from the space entered [13.5]'),
+        prop('vpDelta', '59171,0,a63vpCalc2', '{' + gate + ' ? vpNew - vpOld : 0}', 'a63: space VP change from this move [13.5]'),
+        seq_encode(['setprop', 'mArmyMove', 'false,0,100,false',
+                    seq_encode([seq_encode(['', '59171,0,a63vpCalc2', seq_encode(['P', '{BasicName + " to " + CurrentZone + " [13.5]"}'], ',')], ':')], ','),
+                    'a63: VP report prefix', 'Current Zone/Current Map/Module', ''], ';'),
+        'macro;a63: space VP change;;59172,0,a63vpGo;{vpDelta != 0};;59173\\,0\\,a63vpSend;false;;;counted;;;;false;;1;1',
+        'globalkey;;59173,0,a63vpSend;57983,0,addVP;;false;1;false;true;;Space VP to this side [13.5] (a63);0;'
+        'COUNTER|true|MAP|$map$||||0|0||true|sideCode|$sideCode$|EQUALS||;false;prefixProp:mArmyMove,incVP:{vpDelta}',
+    ]
+    t[i + 1:i + 1] = new
+    s[i + 1:i + 1] = ['', '', '', '', '', '']
+    raw = put_prototype(raw, m, pid, t, s)
+    # 4. Return markers no longer applies space VPs (the block moves do)
+    raw = raw.replace('hotkeys="59159\\,0\\,eobRetR,59158\\,0\\,eobSpaceVP,', 'hotkeys="59159\\,0\\,eobRetR,')
+    for nm in ('a61: Space VP - France', 'a61: Space VP - Coalition'):
+        g = re.search(r'\n\s*<VASSAL\.build\.module\.GlobalKeyCommand [^>]*name="%s"[^>]*/>' % re.escape(nm), raw)
+        raw = raw[:g.start()] + raw[g.end():]
+    return raw
+
+
 def version(raw):
     old = 'nextPieceSlotId="3804" version="2.0.0a60"'
     if old not in raw:
         return None
-    return replace_once(raw, old, 'nextPieceSlotId="3804" version="2.0.0a62"')
+    return replace_once(raw, old, 'nextPieceSlotId="3804" version="2.0.0a63"')
 
 
 FIXES = [env_second_die_after_draw, milop_restrictions, battle_cards_from_every_hand, paired_fronts, mountain_hold,
-         end_of_battle, free_milop_to_paris, version]
+         end_of_battle, free_milop_to_paris, space_vp_on_block_move, version]
 
 if __name__ == '__main__':
     raw = open(BF, encoding='utf-8').read()

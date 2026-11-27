@@ -1,6 +1,15 @@
 # Changelog
 
-## 2.0.0a62 (in preparation)
+## 2.0.0a63 (in preparation)
+
+Everything in 2.0.0a62 below, plus:
+
+- **Space VPs now follow the Army blocks** [13.5] (Mark, 27 Nov 2026). Once the game has started (from the Conference on), moving an Army block on a Front applies the space VPs at once, the same way it already updates hand sizes. The paired block that moves with it scores for its own side, so both sides change together and the chat shows each change ("Army of Elbe to Paris [13.5]: French VP ..."). This follows the pattern Front A already had: every Front space carries, as zone properties, the VP total each power holds on that Front when its block stands there (VPFR for France; VPRU, VPAU or VPBR for the Coalition power). Fronts B to F now have them too, and Austria (Army of Bohemia) has its own on Front A, black spaces only. A black VP number goes to the side that takes the space and is lost by the other; a coloured one (Silesia and Prussia for Russia, Venice for Austria, Naples for Britain) counts only for that power.
+- **Paris** [13.6.5]: Paris is always French-controlled, so a French Army withdrawing or retreating into Paris (or its home box on Fronts B, C and F) loses the VPs of the spaces it leaves, and an Allied Army entering or leaving Paris changes nothing. The Grande Armée's automatic move into Paris is a block move too, so the Track A spaces it abandons are scored as captured by the Allies, as the rule says.
+- *Return markers: battle over* no longer applies space VPs (the block moves do), so nothing is counted twice. The end-of-battle report now says the VPs follow the block moves.
+- Not covered: the Scheldt (British 3 VP, optional rule 15.3) is not on a Front's step track, so its VPs stay manual. Games saved before a63 work as they are: the VPs come from the spaces a block leaves and enters, not from a stored total.
+
+## 2.0.0a62 (not released; superseded by a63)
 
 Everything in 2.0.0a61 below, plus:
 
@@ -18,7 +27,7 @@ Builds on 2.0.0a60 (not yet released). **Load your game, then run Tools > Refres
   2. **Major Battle VP**: if both sides started with 4 or more units (Silesia and Bohemia counted together on Front A), nobody withdrew and it is not the War of 1812 Box, the winner gains 1 VP and the loser loses 1 VP, or 2 when the Napoleon card was played in the battle. On Front A both Russia and Austria (when at war) score. The VP markers move by themselves and the chat shows each change.
   3. **Holding the mountains**: *France holds the mountains* / *Coalition holds the mountains* now opens only when it is allowed: the loser defends in a mountain space, nobody withdrew, the losses differ by exactly one and at least one unit would remain. Pressing it logs the extra loss and the cancelled retreat.
   4. It says who retreats and who advances (or that nobody moves), and which space changes hands. The players move the blocks.
-  5. *Return markers: battle over* applies the space VPs [13.5] for the space that changed hands (none if the mountains were held), then sends the Front's Military Operations to the Diplomacy Display and its Military Support markers to the Force Pools, which locks the Front as before. A black VP number goes to the winner and is lost by the loser. A coloured one (Silesia and Prussia for Russia, Venice for Austria, Scheldt and Naples for Britain) counts only for that power. Castile's 2VP\* and Naples' Austrian 2VP† are end-of-turn VPs and are not touched.
+  5. *Return markers: battle over* (a61/a62 only; from a63 the block moves do this) applied the space VPs [13.5] for the space that changed hands (none if the mountains were held), then sends the Front's Military Operations to the Diplomacy Display and its Military Support markers to the Force Pools, which locks the Front as before. A black VP number goes to the winner and is lost by the loser. A coloured one (Silesia and Prussia for Russia, Venice for Austria, Scheldt and Naples for Britain) counts only for that power. Castile's 2VP\* and Naples' Austrian 2VP† are end-of-turn VPs and are not touched.
 - **Free French Military Operation** [12.4.4]: when the Conference ends with Napoleon available for the War Phase, one French Military Operation not won on a National Track now goes to Paris by itself, from the Diplomacy Display or else the Negotiation Table, and the chat says so. Before, the chat only reminded France to move it by hand. Only one goes, and none if a free one is already in Paris.
 - **Battle cards**: when the last side pressed its ready button, only some hands were sent to the battle window (chosen by which hand pressed last, the front and the player count), and the Russian and British hands could be switched off by the player-count setting. Selected cards could stay behind (reported on Front B: France's cards arrived, Russia's did not). The last ready press now sends the selected cards of every hand, France first as before. Each ready press is reported in the chat, and so is what each side sent.
 
