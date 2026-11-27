@@ -76,7 +76,7 @@ PAIRED_CD = ('(FrontTrack == "C" && sideCode == "BR" && FrontDBR != "" && '
              '(FrontCBR == "Gascony" && FrontDBR !~ "Catalonia|Pyrenees")))')
 NO_SAXONY = '(FrontARU !~ "Saxony|Bavaria|Alsace|Paris" && FrontAAU !~ "Saxony|Bavaria|Alsace|Paris")'
 
-MO_BLOCK = ('{CurrentZone == "Paris" || FrontTrack == "" || CapitalCode != "" ? "" : '
+MO_BLOCK = ('{Phase < Conference || CurrentZone == "Paris" || FrontTrack == "" || CapitalCode != "" ? "" : '
     '(FrontTrack =~ "A|B" && sideCode =~ "FR|RU" && WarState == 1) || (FrontTrack == "DN" && WarState == 1) ? '
     '"The Armistice is in effect: no Military Operation on Front A, Front B or in Denmark/Norway [13.1]." : '
     'FrontTrack == "F" && WarState < 2 ? "Austria is not at war: no Military Operation on Front F [12.4.2]." : '
@@ -138,7 +138,7 @@ def milop_restrictions(raw):
     j = index_of(t, 'macro;Front Track checks start once MO is moved')
     old = '{GameStarted && !OldZone.contains("Track")}'
     assert t[j].count(old) == 1
-    t[j] = t[j].replace(old, '{GameStarted && (!OldZone.contains("Track") || (FrontTrack != "" && CapitalCode == ""))}')
+    t[j] = t[j].replace(old, '{GameStarted && (!OldZone.contains("Track") || (Phase >= Conference && FrontTrack != "" && CapitalCode == ""))}')
     return put_prototype(raw, m, pid, t, s)
 
 
@@ -238,7 +238,7 @@ def paired_fronts(raw):
         'a61: paired front warning'], ';'))
     s.insert(j + 1, '')
     j = index_of(t, 'macro;Rule restriction (a61);')
-    t.insert(j + 1, 'macro;Paired front B warning (a61);;57859,0,register;{FrontTrack == "B" && sideCode == "RU" && '
+    t.insert(j + 1, 'macro;Paired front B warning (a61);;57859,0,register;{Phase >= Conference && FrontTrack == "B" && sideCode == "RU" && '
              'FrontBRU == "Pomerania" && ' + NO_SAXONY + '};;59122\\,0\\,warnMOpairedB;false;;;counted;;;;false;;1;1')
     s.insert(j + 1, '')
     raw = put_prototype(raw, m, pid, t, s)
@@ -565,7 +565,7 @@ def version(raw):
     old = 'nextPieceSlotId="3804" version="2.0.0a60"'
     if old not in raw:
         return None
-    return replace_once(raw, old, 'nextPieceSlotId="3804" version="2.0.0a61"')
+    return replace_once(raw, old, 'nextPieceSlotId="3804" version="2.0.0a62"')
 
 
 FIXES = [env_second_die_after_draw, milop_restrictions, battle_cards_from_every_hand, paired_fronts, mountain_hold,

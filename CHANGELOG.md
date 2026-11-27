@@ -1,6 +1,12 @@
 # Changelog
 
-## 2.0.0a61 (in preparation)
+## 2.0.0a62 (in preparation)
+
+Everything in 2.0.0a61 below, plus:
+
+- **Start-up alert** (Mark, 27 Nov 2026): starting a game could show "A Military Operation in the War of 1812 Box needs at least one of your units or fleets there [13.1]". The a61 placement checks also ran when the module itself moved markers during setup, before the units were in place. The rule checks and the Front B warning now apply only from the Conference on, when players place Military Operations. Setup moves are left alone, as in a60.
+
+## 2.0.0a61 (not released; superseded by a62)
 
 Builds on 2.0.0a60 (not yet released). **Load your game, then run Tools > Refresh Counters** (defaults) so existing pieces pick up the Military Operation checks.
 
